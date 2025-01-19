@@ -27,7 +27,7 @@ function y = highshelving1 (x, Wc, G)
         xh_new=x(n)-c*xh;
         ap_y=c*xh_new+xh;
         xh=xh_new;
-        y(n)=0.5*H*(x(n)-ap_y)+x(n); %change to plus for ls
+        y(n)=0.5*H*(x(n)-ap_y)+x(n); 
     end;
 end;
 
@@ -40,6 +40,7 @@ plot(y);
 figure;
 
 plot(x);
+
 %freq response
 
 % Frequency-domain analysis
