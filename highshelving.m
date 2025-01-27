@@ -1,51 +1,89 @@
 fs = 5000;           
 fc = 100;            
-Wc = 2 * fc / fs;    
-G = -6;              
+G = 6;               
+t = 0:1/fs:1;
+[x,fs]=audioread("C:\Users\gaukh\OneDrive\Документы\MATLAB\edm.wav")
+%x = sin(2*pi*100*t) + sin(2*pi*2000*t);
+if size(x, 2) > 1
+    x = mean(x, 2); 
+end
+t = (0:length(x)-1) / fs;
 
-t = 0:1/fs:1; 
-x = sin(2*pi*100*t) + sin(2*pi*2000*t); 
-y = highshelving1(x, Wc, G);
 
-function y = highshelving1(x, Wc, G)
-    V = 10^(G/20); 
-    H = V - 1;     
-    c = 0.5 * ((tan(pi * Wc / 2) - V) / (tan(pi * Wc / 2) + V)); 
-    fprintf('V: %.4f, H: %.4f, c: %.4f\n', V, H, c);
-    xh = 0;
-    y = zeros(size(x)); 
-    
-    for n = 1:length(x)
-        xh_new = x(n) - c * xh; 
-        ap_y = c * xh_new + xh; 
-        xh = xh_new;            
-        y(n) = V * x(n) + (1 - c) * ap_y; 
-    end
+
+V0 = 10^(G / 20); 
+K = tan(pi * fc / fs);
+
+if G > 0
+    % HF boost coefficients
+    b0 = (V0 + sqrt(2*V0)*K + K^2) / (1 + sqrt(2)*K + K^2);
+    b1 = (2 * (K^2 - V0)) / (1 + sqrt(2)*K + K^2);
+    b2 = (V0 - sqrt(2*V0)*K + K^2) / (1 + sqrt(2)*K + K^2);
+    a1 = (2 * (K^2 - 1)) / (1 + sqrt(2)*K + K^2);
+    a2 = (1 - sqrt(2)*K + K^2) / (1 + sqrt(2)*K + K^2);
+else
+    % HF cut coefficients
+    b0 = (1 + sqrt(2)*K + K^2) / (1 + sqrt(2)*K + V0*K^2);
+    b1 = (2 * (K^2 - 1)) / (1 + sqrt(2)*K + V0*K^2);
+    b2 = (1 - sqrt(2)*K + K^2) / (1 + sqrt(2)*K + V0*K^2);
+    a1 = (2 * (K^2 - 1)) / (1 + sqrt(2)*K + V0*K^2);
+    a2 = (1 - sqrt(2)*K + V0*K^2) / (1 + sqrt(2)*K + V0*K^2);
 end
 
-N = length(x);
-f = (0:N-1) * (fs / N); 
-X = abs(fft(x));
-Y = abs(fft(y));
+% Display coefficients
+fprintf('b0: %.4f, b1: %.4f, b2: %.4f, a1: %.4f, a2: %.4f\n', b0, b1, b2, a1, a2);
+
+x1 = 0; x2 = 0; 
+y1 = 0; y2 = 0; 
+y = zeros(size(x)); 
+
+for n = 1:length(x)
+    y(n) = b0 * x(n) + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1;
+    x1 = x(n);
+    y2 = y1;
+    y1 = y(n);
+end
 
 figure;
 subplot(2, 1, 1);
-plot(f(1:floor(N/2)), X(1:floor(N/2)));
+plot(t, x);
+title('Input Signal');
+xlabel('Time (s)');
+ylabel('Amplitude');
+
+subplot(2, 1, 2);
+plot(t, y);
+title('Filtered Signal');
+xlabel('Time (s)');
+ylabel('Amplitude');
+
+% Frequency
+N = 2^nextpow2(length(x)); 
+f = (0:N-1) * (fs / N); 
+X = abs(fft(x, N));
+Y = abs(fft(y, N));
+
+figure;
+subplot(2, 1, 1);
+plot(f(1:N/2), X(1:N/2));
 title('Input Spectrum');
 xlabel('Frequency (Hz)');
 ylabel('Magnitude');
 
 subplot(2, 1, 2);
-plot(f(1:floor(N/2)), Y(1:floor(N/2)));
+plot(f(1:N/2), Y(1:N/2));
 title('Output Spectrum');
 xlabel('Frequency (Hz)');
 ylabel('Magnitude');
 
-% Calculate boost
-idx_100Hz = round(100 * N / fs);
-idx_2000Hz = round(2000 * N / fs);
-boost_100Hz = Y(idx_100Hz) / X(idx_100Hz);
-boost_2000Hz = Y(idx_2000Hz) / X(idx_2000Hz);
+target_freqs = [100, 2000]; 
+indices = round(target_freqs * N / fs); 
 
-fprintf('Boost at 100 Hz: %.2f\n', boost_100Hz);
-fprintf('Boost at 2000 Hz: %.2f\n', boost_2000Hz);
+for i = 1:length(target_freqs)
+    freq = target_freqs(i);
+    idx = indices(i);
+    boost = Y(idx) / X(idx); 
+    boost_dB = 20 * log10(boost); 
+    fprintf('Frequency: %d Hz, Boost: %.2f (linear), Gain: %.2f dB\n', freq, boost, boost_dB);
+end
