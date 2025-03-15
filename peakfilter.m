@@ -1,0 +1,60 @@
+%function y = peakfilter(x, fs, fc, G, Q)
+    [x, fs] = audioread('whitenoise.wav'); 
+
+    %fs = 48000;
+    fc = 1000.; 
+    G = 7;   
+    Q = 1.5;
+    
+    K = tan(pi * (fc / (fs/2)));
+    V0=10^(G/20);
+    
+    if G>=0
+        b0 = (1 + (V0/Q)*K + K^2) / (1 + (1/Q)*K + K^2);
+        b1 = (2*(K^2 - 1)) / (1 + (1/Q)*K + K^2);
+        b2 = (1 - (V0/Q)*K + K^2) / (1 + (1/Q)*K + K^2);
+    
+        a0 = 1;
+        a1 = (2*(K^2 - 1)) / (1 + (1/Q)*K + K^2);
+        a2 = (1 - (1/Q)*K + K^2) / (1 + (1/Q)*K + K^2);
+    
+    else
+        b0 = (1 + (1/Q)*K + K^2) / (1 + (1/Q)*K + K^2);
+        b1 = (2*(K^2 - 1)) / (1 + (1/Q)*K + K^2);
+        b2 = (1 - (1/Q)*K + K^2) / (1 + (1/Q)*K + K^2);
+    
+        a0 = 1;
+        a1 = (2*(K^2 - 1)) / (1 + (1/(V0*Q))*K + K^2);
+        a2 = (1 - (1/(V0*Q))*K + K^2) / (1 + (1/(V0*Q))*K + K^2);
+    
+    
+    end
+    b = [b0, b1, b2];
+    a = [a0, a1, a2];
+
+    z=fft(x);
+
+    z = fftshift(z);
+    N = length(x);
+    f = [-N/2:N/2-1]/N;
+    plot(f,abs(z))
+    freqz(b,a)
+
+    y = zeros(N,1); 
+
+    for n = 3:N
+        y(n) = b0*x(n) + b1*x(n-1) + b2*x(n-2) - a1*y(n-1) - a2*y(n-2);
+    end
+
+    sound(y, fs);
+    %[H, w] = freqz(b, a, 1024, fs);  
+    %semilogx(w, 20*log10(abs(H)));  
+    %N = length(x);
+    %y = zeros(N,1);  % Ensure y is initialized properly
+
+    % Apply filter loop
+    %for n = 3:N  
+    %    y(n) = b0*x(n) + b1*x(n-1) + b2*x(n-2) - a1*y(n-1) - a2*y(n-2);
+    %end
+
+
